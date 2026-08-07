@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Athlete — Carnet d'entraînement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   ATHLETE — DESIGN SYSTEM (V3, phase 1: architecture & UX)
+   ----------------------------------------------------------
+   Palette      : graphite (warm near-black, not device-black)
+                  + ember (effort/force) + flow (récupération)
+                  + brass (jalons/objectifs, usage rare)
+   Type         : Big Shoulders Display (chiffres, titres —
+                  registre "dossard / chrono de bord de piste")
+                  Manrope (texte courant)
+                  JetBrains Mono (données, dates, unités)
+   Signature    : cadran chronographe à triple arc
+                  (Force / Explosivité / Récupération)
+   Structure    : "lanes" (couloirs) comme séparateurs de
+                  section — écho direct au blend nageur/
+                  sprinteur qui définit tout le programme.
+   ============================================================ */
+:root{
+  /* surfaces */
+  --ink:#0C0D0E;
+  --surface:#151619;
+  --surface-2:#1D1F23;
+  --surface-3:#26282D;
+  --hairline: rgba(238,240,242,0.08);
+  --hairline-strong: rgba(238,240,242,0.16);
+
+  /* text */
+  --chalk:#EEF0F2;
+  --chalk-70: rgba(238,240,242,0.70);
+  --chalk-45: rgba(238,240,242,0.45);
+  --chalk-25: rgba(238,240,242,0.25);
+
+  /* accents */
+  --ember:#FF5A34;
+  --ember-dim: rgba(255,90,52,0.14);
+  --flow:#4FA6E0;
+  --flow-dim: rgba(79,166,224,0.14);
+  --brass:#C7A24B;
+  --brass-dim: rgba(199,162,75,0.16);
+  --good:#3FBF8F;
+
+  /* geometry */
+  --radius-lg:26px;
+  --radius-md:18px;
+  --radius-sm:12px;
+  --ease: cubic-bezier(.22,1,.36,1);
+  --max-w: 480px;
+}
+
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0; padding:0;}
+body{
+  background:var(--ink);
+  color:var(--chalk);
+  font-family:'Manrope',-apple-system,BlinkMacSystemFont,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+button{font-family:inherit; border:none; background:none; color:inherit; cursor:pointer; padding:0;}
+::selection{background:var(--ember-dim); color:var(--ember);}
+img,svg{display:block;}
+
+.mono{font-family:'JetBrains Mono',monospace;}
+.display{
+  font-family:'Big Shoulders Display',sans-serif;
+  text-transform:uppercase;
+  letter-spacing:0.01em;
+}
+
+/* reveal-on-scroll, restrained: used once per section, not per row */
+.reveal{opacity:0; transform:translateY(10px); transition:opacity .5s var(--ease), transform .5s var(--ease);}
+.reveal.in-view{opacity:1; transform:translateY(0);}
+@media (prefers-reduced-motion: reduce){
+  .reveal{opacity:1; transform:none; transition:none;}
+}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+.app-shell{
+  max-width:var(--max-w);
+  margin:0 auto;
+  min-height:100vh;
+  position:relative;
+  padding-bottom:100px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255,90,52,0.07), transparent 40%),
+    radial-gradient(circle at 100% 10%, rgba(79,166,224,0.06), transparent 38%),
+    var(--ink);
+}
+
+/* ============================================================
+   TOPBAR
+   ============================================================ */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:22px 20px 16px;
+  border-bottom:1px solid var(--hairline);
+}
+.topbar .brand{display:flex; flex-direction:column; gap:2px;}
+.topbar .brand .word{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-weight:800; font-size:22px; line-height:1;
+  letter-spacing:0.02em; text-transform:uppercase;
+}
+.topbar .brand .word em{font-style:normal; color:var(--ember);}
+.topbar .brand .sub{
+  font-family:'JetBrains Mono',monospace;
+  font-size:9.5px; color:var(--chalk-45);
+  letter-spacing:0.08em; text-transform:uppercase;
+}
+.date-pill{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px; color:var(--chalk-70);
+  border:1px solid var(--hairline-strong);
+  border-radius:999px;
+  padding:7px 12px;
+  white-space:nowrap;
+}
+
+/* ============================================================
+   VIEWS
+   ============================================================ */
+main{position:relative;}
+.view{display:none; padding:0 20px;}
+.view.active{display:block; animation:viewIn .3s var(--ease);}
+@keyframes viewIn{from{opacity:0; transform:translateY(5px);} to{opacity:1; transform:translateY(0);}}
+
+.view-header{
+  display:flex; align-items:baseline; justify-content:space-between;
+  padding-top:26px; margin-bottom:6px;
+}
+.view-header h1{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:26px; font-weight:800; text-transform:uppercase;
+  letter-spacing:0.01em; margin:0;
+}
+.view-header .tag{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10.5px; color:var(--chalk-45);
+}
+
+/* ============================================================
+   LANE DIVIDER — structural device tied to the swim/track-lane
+   metaphor at the core of the program (blend of disciplines).
+   ============================================================ */
+.lane{display:flex; align-items:center; gap:10px; margin:34px 0 16px;}
+.lane .dot{width:6px; height:6px; border-radius:50%; flex-shrink:0;}
+.lane .dot.ember{background:var(--ember); box-shadow:0 0 8px rgba(255,90,52,0.6);}
+.lane .dot.flow{background:var(--flow); box-shadow:0 0 8px rgba(79,166,224,0.6);}
+.lane .dot.brass{background:var(--brass); box-shadow:0 0 8px rgba(199,162,75,0.6);}
+.lane .label{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10.5px; color:var(--chalk-45);
+  letter-spacing:0.09em; text-transform:uppercase;
+  white-space:nowrap;
+}
+.lane .rule{flex:1; height:1px; background:var(--hairline);}
+
+/* ============================================================
+   HOME — HERO / CHRONOGRAPH RING
+   ============================================================ */
+.hero-greeting{padding-top:22px;}
+.hero-greeting .hi{font-size:14px; color:var(--chalk-70); margin:0 0 2px;}
+.hero-greeting .hi b{color:var(--chalk); font-weight:700;}
+.hero-greeting .day-full{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px; color:var(--chalk-45);
+}
+
+.dial-block{
+  display:flex; align-items:center; gap:22px;
+  margin-top:22px;
+}
+.dial-wrap{
+  position:relative; width:172px; height:172px; flex-shrink:0;
+}
+.bezel{
+  position:absolute; inset:-16px;
+  border-radius:50%;
+  background: repeating-conic-gradient(var(--chalk-25) 0deg 1.4deg, transparent 1.4deg 9deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 7px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 7px));
+}
+.dial-wrap svg{transform:rotate(-90deg);}
+.ring-bg{stroke:var(--surface-3); fill:none;}
+.ring-fg{stroke-linecap:round; fill:none; transition:stroke-dashoffset 1.2s var(--ease);}
+.dial-center{
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.dial-center .metric{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-weight:800; font-size:30px; line-height:1; color:var(--chalk);
+}
+.dial-center .metric small{font-size:14px; color:var(--chalk-45); font-weight:600;}
+.dial-center .metric-lbl{
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px; color:var(--chalk-45);
+  letter-spacing:0.06em; text-transform:uppercase; margin-top:4px;
+}
+
+.dial-legend{flex:1; display:flex; flex-direction:column; gap:12px;}
+.dial-row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.dial-row-left{display:flex; align-items:center; gap:8px;}
+.dial-row .swatch{width:8px; height:8px; border-radius:2px; flex-shrink:0;}
+.dial-row .name{font-size:12.5px; color:var(--chalk-70);}
+.dial-row .val{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--chalk-45);}
+.dial-caption{
+  font-size:11px; line-height:1.5; color:var(--chalk-45);
+  margin-top:16px; padding-top:14px; border-top:1px solid var(--hairline);
+}
+
+/* ============================================================
+   CARDS — shared shell
+   ============================================================ */
+.card{
+  background:var(--surface);
+  border:1px solid var(--hairline);
+  border-radius:var(--radius-lg);
+  padding:20px;
+}
+.card + .card{margin-top:12px;}
+
+/* today: cycle overview */
+.chip-row{display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; margin:14px 0 16px;}
+.chip-row::-webkit-scrollbar{display:none;}
+.chip{
+  flex-shrink:0;
+  font-family:'JetBrains Mono',monospace;
+  font-size:10.5px; font-weight:600;
+  padding:7px 10px; border-radius:10px;
+  background:var(--surface-2); color:var(--chalk-45);
+  border:1px solid var(--hairline);
+  white-space:nowrap;
+}
+.chip.force{color:var(--ember); border-color:rgba(255,90,52,0.3); background:var(--ember-dim);}
+.chip.explo{color:var(--brass); border-color:rgba(199,162,75,0.3); background:var(--brass-dim);}
+.chip.repos{color:var(--chalk-45);}
+
+.flagship{
+  display:flex; align-items:center; gap:14px;
+  padding-top:14px; border-top:1px solid var(--hairline);
+}
+.flagship-num{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-weight:800; font-size:15px; color:var(--ink);
+  background:var(--ember);
+  width:38px; height:38px; border-radius:11px;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.flagship-info{flex:1; min-width:0;}
+.flagship-info .t{font-size:14px; font-weight:700; margin-bottom:2px;}
+.flagship-info .s{font-size:11.5px; color:var(--chalk-45);}
+.flagship-go{
+  width:34px; height:34px; border-radius:50%;
+  border:1px solid var(--hairline-strong);
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; transition:background .2s var(--ease), border-color .2s var(--ease);
+}
+.flagship-go svg{width:15px; height:15px; stroke:var(--chalk-70); fill:none; stroke-width:2;}
+.flagship-go:active{background:var(--surface-2); border-color:var(--ember);}
+
+/* trajectory */
+.traj-nums{display:flex; align-items:baseline; gap:8px; margin-bottom:14px;}
+.traj-nums .from{font-family:'JetBrains Mono',monospace; font-size:15px; color:var(--chalk-45);}
+.traj-nums .arrow{color:var(--chalk-25);}
+.traj-nums .to{font-family:'Big Shoulders Display',sans-serif; font-weight:800; font-size:24px; color:var(--flow);}
+.traj-nums .delta{
+  margin-left:auto;
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  color:var(--chalk-45); background:var(--surface-2);
+  padding:4px 9px; border-radius:8px;
+}
+.bar-track{height:7px; border-radius:999px; background:var(--surface-3); overflow:hidden;}
+.bar-fill{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--flow), #8FD0F5); width:0%; transition:width 1.2s var(--ease);}
+.traj-meta{display:flex; justify-content:space-between; margin-top:12px;}
+.traj-meta div{font-size:11px; color:var(--chalk-45);}
+.traj-meta b{color:var(--chalk-70); font-family:'JetBrains Mono',monospace; font-weight:600;}
+.traj-note{
+  font-size:11.5px; line-height:1.5; color:var(--chalk-45);
+  margin-top:14px; padding-top:14px; border-top:1px solid var(--hairline);
+}
+
+.footnote{
+  font-size:10.5px; color:var(--chalk-25); line-height:1.6;
+  text-align:center; padding:30px 10px 10px;
+}
+
+/* ============================================================
+   TRAINING — day accordion
+   ============================================================ */
+.day-card{
+  background:var(--surface);
+  border:1px solid var(--hairline);
+  border-radius:var(--radius-lg);
+  margin-bottom:10px;
+  overflow:hidden;
+}
+.day-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 18px; gap:12px;
+}
+.day-head-left{display:flex; align-items:center; gap:13px; min-width:0;}
+.day-num{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:13px; font-weight:800; color:var(--ink);
+  background:var(--chalk-45);
+  width:32px; height:32px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.day-num.force{background:var(--ember);}
+.day-num.explo{background:var(--brass);}
+.day-num.rest{background:var(--surface-3); color:var(--chalk-45);}
+.day-title{font-size:15px; font-weight:700; margin-bottom:2px;}
+.day-meta{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+.day-meta span{font-size:11px; color:var(--chalk-45);}
+.badge{
+  font-family:'JetBrains Mono',monospace;
+  font-size:9.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.03em;
+  padding:3px 8px; border-radius:999px;
+  background:var(--surface-2); color:var(--chalk-45);
+  white-space:nowrap; flex-shrink:0;
+}
+.badge.force{background:var(--ember-dim); color:var(--ember);}
+.badge.hyper{background:var(--flow-dim); color:var(--flow);}
+.badge.explo{background:var(--brass-dim); color:var(--brass);}
+.chev{
+  width:18px; height:18px; stroke:var(--chalk-45); fill:none; stroke-width:2;
+  transition:transform .3s var(--ease); flex-shrink:0;
+}
+.day-card.open .chev{transform:rotate(180deg);}
+.day-body{max-height:0; overflow:hidden; transition:max-height .4s var(--ease);}
+.day-card.open .day-body{max-height:2400px;}
+.day-body-inner{padding:0 16px 18px;}
+.day-note{
+  font-size:12px; line-height:1.55; color:var(--chalk-45);
+  background:var(--surface-2); border-radius:var(--radius-sm);
+  padding:12px 14px; margin-bottom:10px;
+}
+.ex-row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:11px 2px; border-bottom:1px solid var(--hairline);
+}
+.ex-row:last-child{border-bottom:none;}
+.ex-row .ex-name{font-size:12.5px; font-weight:600; color:var(--chalk);}
+.ex-row .ex-muscle{font-size:10.5px; color:var(--chalk-45); margin-top:1px;}
+.ex-row .ex-nums{
+  font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--chalk-70);
+  white-space:nowrap; flex-shrink:0; text-align:right;
+}
+
+/* ============================================================
+   PROGRESS
+   ============================================================ */
+.stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px;}
+.stat-tile{
+  background:var(--surface); border:1px solid var(--hairline);
+  border-radius:var(--radius-md); padding:16px;
+}
+.stat-tile .v{font-family:'Big Shoulders Display',sans-serif; font-weight:800; font-size:22px;}
+.stat-tile .v small{font-size:12px; color:var(--chalk-45); font-weight:600;}
+.stat-tile .k{font-size:11px; color:var(--chalk-45); margin-top:4px;}
+.stat-tile.accent-ember .v{color:var(--ember);}
+.stat-tile.accent-flow .v{color:var(--flow);}
+
+.muscle-card{display:flex; align-items:center; gap:18px;}
+.muscle-svg{width:104px; flex-shrink:0;}
+.muscle-legend{flex:1; display:flex; flex-direction:column; gap:9px;}
+.mrow{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.mrow-left{display:flex; align-items:center; gap:8px;}
+.mrow .dot2{width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--ember);}
+.mrow .name{font-size:12.5px; color:var(--chalk-70);}
+.mrow .pct{font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--chalk-45);}
+
+.empty-chart{
+  border:1px dashed var(--hairline-strong);
+  border-radius:var(--radius-lg);
+  padding:22px 20px;
+}
+.ghost-line{width:100%; height:70px; margin-bottom:14px;}
+.empty-chart h3{font-size:14px; margin:0 0 6px;}
+.empty-chart p{font-size:12px; line-height:1.55; color:var(--chalk-45); margin:0;}
+
+.fields-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px;}
+.field-tile{
+  background:var(--surface); border:1px solid var(--hairline);
+  border-radius:var(--radius-sm); padding:13px 14px;
+}
+.field-tile .k{font-size:10.5px; color:var(--chalk-45); margin-bottom:4px;}
+.field-tile .v{font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--chalk-25);}
+
+/* ============================================================
+   JOURNAL — empty state
+   ============================================================ */
+.empty-state{
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  padding:56px 20px 20px;
+}
+.empty-state .icon{
+  width:56px; height:56px; border-radius:18px;
+  background:var(--surface); border:1px solid var(--hairline);
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:18px;
+}
+.empty-state .icon svg{width:24px; height:24px; stroke:var(--chalk-45); fill:none; stroke-width:1.6;}
+.empty-state h3{font-size:16px; margin:0 0 8px;}
+.empty-state p{font-size:12.5px; line-height:1.6; color:var(--chalk-45); max-width:32ch; margin:0;}
+
+/* ============================================================
+   PROFILE
+   ============================================================ */
+.profile-head{display:flex; align-items:center; gap:14px; padding-top:22px; margin-bottom:8px;}
+.avatar{
+  width:56px; height:56px; border-radius:16px;
+  background:linear-gradient(155deg, var(--ember), #C93E1E);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Big Shoulders Display',sans-serif; font-weight:800; font-size:22px;
+  color:var(--ink); flex-shrink:0;
+}
+.profile-head .name{font-size:17px; font-weight:700;}
+.profile-head .meta{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--chalk-45); margin-top:3px;}
+
+.list-card{
+  background:var(--surface); border:1px solid var(--hairline);
+  border-radius:var(--radius-lg); overflow:hidden;
+}
+.list-row{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 18px; border-bottom:1px solid var(--hairline);
+}
+.list-row:last-child{border-bottom:none;}
+.list-row .name{font-size:13px; color:var(--chalk-70);}
+.list-row .val{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--chalk);}
+
+.adapt-card{padding:18px;}
+.adapt-card h3{font-size:13px; margin:0 0 10px;}
+.adapt-item{
+  display:flex; gap:9px; font-size:12px; line-height:1.5; color:var(--chalk-45);
+  padding:7px 0;
+}
+.adapt-item svg{width:13px; height:13px; stroke:var(--flow); fill:none; stroke-width:2.4; flex-shrink:0; margin-top:2px;}
+
+/* ============================================================
+   TABBAR
+   ============================================================ */
+.tabbar{
+  position:fixed; left:50%; bottom:0; transform:translateX(-50%);
+  width:100%; max-width:var(--max-w); z-index:100;
+  display:flex; justify-content:space-around; align-items:center;
+  padding:10px 8px calc(10px + env(safe-area-inset-bottom));
+  background:rgba(12,13,14,0.82);
+  backdrop-filter:blur(20px) saturate(160%);
+  -webkit-backdrop-filter:blur(20px) saturate(160%);
+  border-top:1px solid var(--hairline);
+}
+.tab{
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  padding:6px 10px; border-radius:14px;
+  color:var(--chalk-25);
+  transition:color .2s var(--ease), transform .15s var(--ease);
+}
+.tab svg{width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.8;}
+.tab span{font-size:9.5px; font-weight:700; letter-spacing:0.02em;}
+.tab.active{color:var(--ember);}
+.tab:active{transform:scale(0.92);}
+
+@media(min-width:520px){
+  .app-shell{border-left:1px solid var(--hairline); border-right:1px solid var(--hairline);}
+}
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ============================================================
+       TOPBAR
+       ============================================================ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="word">ATHL<em>E</em>TE</span>
+      <span class="sub">Basic Fit · Split 5 jours</span>
+    </div>
+    <span class="date-pill" id="date-pill">—</span>
+  </header>
+
+  <main>
+
+    <!-- ============================================================
+         VIEW 1 — AUJOURD'HUI
+         ============================================================ -->
+    <section class="view active" id="view-today">
+
+      <div class="hero-greeting reveal">
+        <p class="hi">Salut, <b>athlète</b>.</p>
+        <p class="day-full" id="day-full">—</p>
+      </div>
+
+      <div class="dial-block reveal">
+        <div class="dial-wrap">
+          <div class="bezel"></div>
+          <svg width="172" height="172" viewBox="0 0 172 172">
+            <circle class="ring-bg" cx="86" cy="86" r="76" stroke-width="9"/>
+            <circle class="ring-fg" id="ring-force" cx="86" cy="86" r="76" stroke-width="9" stroke="var(--ember)"/>
+            <circle class="ring-bg" cx="86" cy="86" r="59" stroke-width="9"/>
+            <circle class="ring-fg" id="ring-explo" cx="86" cy="86" r="59" stroke-width="9" stroke="var(--brass)"/>
+            <circle class="ring-bg" cx="86" cy="86" r="42" stroke-width="9"/>
+            <circle class="ring-fg" id="ring-recup" cx="86" cy="86" r="42" stroke-width="9" stroke="var(--flow)"/>
+          </svg>
+          <div class="dial-center">
+            <span class="metric">+7<small>,1kg</small></span>
+            <span class="metric-lbl">à prendre</span>
+          </div>
+        </div>
+        <div class="dial-legend">
+          <div class="dial-row">
+            <div class="dial-row-left"><span class="swatch" style="background:var(--ember)"></span><span class="name">Force</span></div>
+            <span class="val">élevé</span>
+          </div>
+          <div class="dial-row">
+            <div class="dial-row-left"><span class="swatch" style="background:var(--brass)"></span><span class="name">Explosivité</span></div>
+            <span class="val">modéré</span>
+          </div>
+          <div class="dial-row">
+            <div class="dial-row-left"><span class="swatch" style="background:var(--flow)"></span><span class="name">Récupération</span></div>
+            <span class="val">bon</span>
+          </div>
+        </div>
+      </div>
+      <p class="dial-caption">Empreinte du programme — pondération des trois piliers sur ton cycle actuel. Le suivi en direct (séances réellement effectuées) arrive dans une prochaine étape.</p>
+
+      <div class="lane"><span class="dot ember"></span><span class="label">Lane 01 — Cycle de la semaine</span><span class="rule"></span></div>
+      <div class="card reveal">
+        <div class="chip-row" id="chip-row"></div>
+        <div class="flagship" id="flagship" onclick="jumpToDay(2)">
+          <div class="flagship-num">J3</div>
+          <div class="flagship-info">
+            <div class="t">Dos XXL</div>
+            <div class="s">Volume dos maximal de la semaine · 7 exercices</div>
+          </div>
+          <div class="flagship-go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+        </div>
+      </div>
+
+      <div class="lane"><span class="dot flow"></span><span class="label">Lane 02 — Trajectoire</span><span class="rule"></span></div>
+      <div class="card reveal">
+        <div class="traj-nums">
+          <span class="from">62,9kg</span>
+          <span class="arrow">→</span>
+          <span class="to">70kg</span>
+          <span class="delta">+7,1kg</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="traj-bar"></div></div>
+        <div class="traj-meta">
+          <div>Rythme visé <b>+0,25–0,5kg</b>/sem</div>
+          <div><b id="weeks-left">—</b> sem. restantes</div>
+        </div>
+        <p class="traj-note">Poids stabilisé à 62,9kg depuis fin juillet après une phase fluctuante — ce chiffre sert de nouvelle référence de départ pour le cycle vers 70kg.</p>
+      </div>
+
+      <p class="footnote">Athlete — architecture V3. Design et navigation uniquement : le suivi en direct, les graphiques et le mode entraînement arrivent par étapes.</p>
+    </section>
+
+    <!-- ============================================================
+         VIEW 2 — ENTRAÎNEMENT
+         ============================================================ -->
+    <section class="view" id="view-training">
+      <div class="view-header"><h1>Entraînement</h1><span class="tag">5 séances / sem</span></div>
+      <div id="days-mount" style="margin-top:16px;"></div>
+      <p class="footnote">Ouvre une séance pour voir le détail des exercices. Le mode entraînement (séries cochées, minuteur de repos, charges saisies) sera ajouté dans une prochaine étape.</p>
+    </section>
+
+    <!-- ============================================================
+         VIEW 3 — PROGRÈS
+         ============================================================ -->
+    <section class="view" id="view-progress">
+      <div class="view-header"><h1>Progrès</h1><span class="tag">vue d'ensemble</span></div>
+
+      <div class="stat-grid">
+        <div class="stat-tile"><div class="v">62<small>,9kg</small></div><div class="k">Poids actuel</div></div>
+        <div class="stat-tile accent-flow"><div class="v">70<small>kg</small></div><div class="k">Objectif</div></div>
+        <div class="stat-tile accent-ember"><div class="v">+7<small>,1kg</small></div><div class="k">Écart restant</div></div>
+        <div class="stat-tile"><div class="v" id="stat-weeks">—</div><div class="k">Semaines restantes</div></div>
+      </div>
+
+      <div class="lane"><span class="dot ember"></span><span class="label">Répartition musculaire</span><span class="rule"></span></div>
+      <div class="card muscle-card reveal">
+        <svg class="muscle-svg" viewBox="0 0 100 200">
+          <circle cx="50" cy="18" r="13" fill="var(--surface-3)"/>
+          <rect x="40" y="33" width="20" height="10" rx="4" fill="var(--surface-3)"/>
+          <circle cx="26" cy="52" r="11" fill="var(--ember)"/>
+          <circle cx="74" cy="52" r="11" fill="var(--ember)"/>
+          <rect x="34" y="46" width="32" height="26" rx="10" fill="var(--ember)" opacity="0.72"/>
+          <rect x="14" y="60" width="11" height="46" rx="5.5" fill="var(--surface-3)"/>
+          <rect x="75" y="60" width="11" height="46" rx="5.5" fill="var(--surface-3)"/>
+          <rect x="38" y="74" width="24" height="34" rx="8" fill="var(--surface-3)"/>
+          <rect x="32" y="110" width="36" height="16" rx="8" fill="var(--surface-3)"/>
+          <rect x="33" y="128" width="15" height="60" rx="7" fill="var(--ember)" opacity="0.5"/>
+          <rect x="52" y="128" width="15" height="60" rx="7" fill="var(--ember)" opacity="0.5"/>
+        </svg>
+        <div class="muscle-legend">
+          <div class="mrow"><div class="mrow-left"><span class="dot2" style="background:var(--ember)"></span><span class="name">Dos</span></div><span class="pct">26%</span></div>
+          <div class="mrow"><div class="mrow-left"><span class="dot2" style="background:var(--ember)"></span><span class="name">Épaules</span></div><span class="pct">22%</span></div>
+          <div class="mrow"><div class="mrow-left"><span class="dot2" style="background:var(--ember); opacity:.72"></span><span class="name">Pecs</span></div><span class="pct">20%</span></div>
+          <div class="mrow"><div class="mrow-left"><span class="dot2" style="background:var(--ember); opacity:.5"></span><span class="name">Jambes</span></div><span class="pct">18%</span></div>
+          <div class="mrow"><div class="mrow-left"><span class="dot2" style="background:var(--surface-3); border:1px solid var(--chalk-25)"></span><span class="name">Bras / core</span></div><span class="pct">14%</span></div>
+        </div>
+      </div>
+
+      <div class="lane"><span class="dot flow"></span><span class="label">Historique</span><span class="rule"></span></div>
+      <div class="empty-chart reveal">
+        <svg class="ghost-line" viewBox="0 0 300 70" preserveAspectRatio="none">
+          <polyline points="0,50 40,46 80,52 120,40 160,42 200,28 240,30 300,14" fill="none" stroke="var(--chalk-25)" stroke-width="2" stroke-dasharray="5 6" stroke-linecap="round"/>
+        </svg>
+        <h3>Courbes de poids &amp; composition à venir</h3>
+        <p>Une fois le suivi activé, tes pesées et ta masse grasse s'afficheront ici sous forme de courbes. Pour l'instant, cet espace réserve la place dans la mise en page.</p>
+      </div>
+
+      <div class="lane"><span class="dot brass"></span><span class="label">Records &amp; mensurations</span><span class="rule"></span></div>
+      <div class="fields-grid">
+        <div class="field-tile"><div class="k">Développé couché</div><div class="v">—</div></div>
+        <div class="field-tile"><div class="k">Tractions lestées</div><div class="v">—</div></div>
+        <div class="field-tile"><div class="k">Presse à cuisses</div><div class="v">—</div></div>
+        <div class="field-tile"><div class="k">Sprint 30m</div><div class="v">—</div></div>
+        <div class="field-tile"><div class="k">Poitrine</div><div class="v">—</div></div>
+        <div class="field-tile"><div class="k">Épaules</div><div class="v">—</div></div>
+        <div class="field-tile"><div class="k">Bras</div><div class="v">—</div></div>
+        <div class="field-tile"><div class="k">Taille</div><div class="v">—</div></div>
+      </div>
+      <p class="footnote">Champs à renseigner une fois le mode saisie développé.</p>
+    </section>
+
+    <!-- ============================================================
+         VIEW 4 — JOURNAL
+         ============================================================ -->
+    <section class="view" id="view-journal">
+      <div class="view-header"><h1>Journal</h1><span class="tag">carnet de bord</span></div>
+      <div class="empty-state reveal">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M6 4h9l3 3v13a1 1 0 01-1 1H6a1 1 0 01-1-1V5a1 1 0 011-1z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></div>
+        <h3>Ton carnet est vide</h3>
+        <p>Une fois le mode entraînement actif, chaque séance terminée viendra s'ajouter ici automatiquement — sensations, charges, ressenti.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         VIEW 5 — PROFIL
+         ============================================================ -->
+    <section class="view" id="view-profile">
+      <div class="profile-head">
+        <div class="avatar">A</div>
+        <div>
+          <div class="name" id="profile-age">Athlète — 20 ans</div>
+          <div class="meta">1m69 · Basic Fit · Style athlétique-esthétique</div>
+        </div>
+      </div>
+
+      <div class="lane"><span class="dot ember"></span><span class="label">Composition corporelle</span><span class="rule"></span></div>
+      <div class="list-card">
+        <div class="list-row"><span class="name">Poids actuel</span><span class="val">62,9 kg</span></div>
+        <div class="list-row"><span class="name">Objectif</span><span class="val">70 kg</span></div>
+        <div class="list-row"><span class="name">Masse grasse</span><span class="val">~16%</span></div>
+        <div class="list-row"><span class="name">Masse musculaire</span><span class="val">80%</span></div>
+      </div>
+
+      <div class="lane"><span class="dot flow"></span><span class="label">Nutrition</span><span class="rule"></span></div>
+      <div class="list-card">
+        <div class="list-row"><span class="name">Calories / jour</span><span class="val">2900–3100 kcal</span></div>
+        <div class="list-row"><span class="name">Protéines / jour</span><span class="val">130–150 g</span></div>
+        <div class="list-row"><span class="name">Gain hebdo visé</span><span class="val">+0,25–0,5 kg</span></div>
+        <div class="list-row"><span class="name">Hydratation</span><span class="val">2,5–3 L</span></div>
+      </div>
+
+      <div class="lane"><span class="dot brass"></span><span class="label">Adaptations du programme</span><span class="rule"></span></div>
+      <div class="card adapt-card">
+        <h3>Écartés volontairement</h3>
+        <div class="adapt-item"><svg viewBox="0 0 24 24"><path d="M4 12l6 6L20 6"/></svg><span>Squat barre, soulevé de terre roumain, hip thrust, cable kickback, ab wheel — remplacés par presse à cuisses, leg curl, machine crunch et poulie.</span></div>
+        <div class="adapt-item"><svg viewBox="0 0 24 24"><path d="M4 12l6 6L20 6"/></svg><span>Pas de sac de frappe disponible — boxe remplacée par rameur, kettlebell et shadow boxing à mains nues.</span></div>
+        <div class="adapt-item"><svg viewBox="0 0 24 24"><path d="M4 12l6 6L20 6"/></svg><span>Abdos travaillés en charge et en dynamique (poulie, machine) plutôt qu'en gainage statique seul.</span></div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <button type="button" id="open-edit-profile" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--chalk-70);border:1px solid var(--hairline-strong);border-radius:999px;padding:7px 12px;">Modifier mon profil</button>
+      </div>
+
+      <p class="footnote">Ces informations reflètent tes préférences déclarées. Elles pourront être modifiées une fois l'édition de profil développée.</p>
+    </section>
+
+    <section class="view" id="view-edit-profile">
+      <div class="view-header"><h1>Modifier mon profil</h1><span class="tag">mise à jour</span></div>
+      <div class="card" style="margin-top:16px;">
+        <form id="profile-edit-form">
+          <div class="list-card">
+            <div class="list-row">
+              <label class="name" for="edit-firstname">Prénom</label>
+              <input id="edit-firstname" name="firstName" type="text" value="" style="background:transparent;border:none;color:var(--chalk);font:inherit;text-align:right;width:120px;outline:none;" />
+            </div>
+            <div class="list-row">
+              <label class="name" for="edit-height">Taille (cm)</label>
+              <input id="edit-height" name="height" type="number" inputmode="numeric" value="" style="background:transparent;border:none;color:var(--chalk);font:inherit;text-align:right;width:120px;outline:none;" />
+            </div>
+            <div class="list-row">
+              <label class="name" for="edit-currentWeight">Poids actuel (kg)</label>
+              <input id="edit-currentWeight" name="currentWeight" type="number" step="0.1" inputmode="decimal" value="" style="background:transparent;border:none;color:var(--chalk);font:inherit;text-align:right;width:120px;outline:none;" />
+            </div>
+            <div class="list-row">
+              <label class="name" for="edit-targetWeight">Poids cible (kg)</label>
+              <input id="edit-targetWeight" name="targetWeight" type="number" step="0.1" inputmode="decimal" value="" style="background:transparent;border:none;color:var(--chalk);font:inherit;text-align:right;width:120px;outline:none;" />
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; margin-top:14px;">
+            <button type="submit" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--chalk-70);border:1px solid var(--hairline-strong);border-radius:999px;padding:7px 12px;">Enregistrer</button>
+            <button type="button" id="cancel-edit-profile" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--chalk-45);border:1px solid var(--hairline-strong);border-radius:999px;padding:7px 12px;">Retour</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       TABBAR
+       ============================================================ -->
+  <nav class="tabbar">
+    <button class="tab active" data-view="today">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+      <span>Aujourd'hui</span>
+    </button>
+    <button class="tab" data-view="training">
+      <svg viewBox="0 0 24 24"><path d="M4 8v8M8 6v12M20 8v8M16 6v12"/><path d="M8 12h8"/></svg>
+      <span>Séances</span>
+    </button>
+    <button class="tab" data-view="progress">
+      <svg viewBox="0 0 24 24"><path d="M4 20V11M11 20V6M18 20v-7"/></svg>
+      <span>Progrès</span>
+    </button>
+    <button class="tab" data-view="journal">
+      <svg viewBox="0 0 24 24"><path d="M6 4h9l3 3v13a1 1 0 01-1 1H6a1 1 0 01-1-1V5a1 1 0 011-1z"/><path d="M9 9h6M9 13h6"/></svg>
+      <span>Journal</span>
+    </button>
+    <button class="tab" data-view="profile">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+      <span>Profil</span>
+    </button>
+  </nav>
+
+</div>
+
+<script>
+/* ============================================================
+   DATA
+   Centralized source of truth for the current UI content.
+   The visual structure remains unchanged; only the data source
+   is now dynamic and grouped in one object.
+   ============================================================ */
+const userData = {
+  profile: {
+    firstName: 'Athlète',
+    lastName: '',
+    birthDate: '2005-10-30',
+    height: 169,
+    currentWeight: 62.9,
+    targetWeight: 70,
+    startingWeight: 62.9,
+    bodyFat: 16,
+    muscleMass: 80,
+    gym: 'Basic Fit',
+    style: 'Style athlétique-esthétique',
+    avatarInitial: 'A'
+  },
+  nutrition: {
+    calories: 2900,
+    proteins: 130,
+    carbs: 320,
+    lipids: 90,
+    water: '2,5–3 L'
+  },
+  objective: {
+    targetDate: '2026-12-31',
+    weeklyGain: '+0,25–0,5 kg',
+    goalLabel: 'à prendre'
+  },
+  progression: {
+    bmi: 22,
+    bodyFat: 16,
+    progression: '+7,1kg',
+    dial: [
+      {name: 'Force', value: 'élevé', color: 'var(--ember)', pct: 78},
+      {name: 'Explosivité', value: 'modéré', color: 'var(--brass)', pct: 58},
+      {name: 'Récupération', value: 'bon', color: 'var(--flow)', pct: 68}
+    ],
+    muscleDistribution: [
+      {name: 'Dos', pct: 26, color: 'var(--ember)'},
+      {name: 'Épaules', pct: 22, color: 'var(--ember)'},
+      {name: 'Pecs', pct: 20, color: 'var(--ember)', opacity: 0.72},
+      {name: 'Jambes', pct: 18, color: 'var(--ember)', opacity: 0.5},
+      {name: 'Bras / core', pct: 14, color: 'var(--surface-3)', border: true}
+    ],
+    records: [
+      {label: 'Développé couché', value: '—'},
+      {label: 'Tractions lestées', value: '—'},
+      {label: 'Presse à cuisses', value: '—'},
+      {label: 'Sprint 30m', value: '—'},
+      {label: 'Poitrine', value: '—'},
+      {label: 'Épaules', value: '—'},
+      {label: 'Bras', value: '—'},
+      {label: 'Taille', value: '—'}
+    ]
+  },
+  program: {
+    weeklySessionCount: 5,
+    days: [
+      {
+        tag: 'J1', title: 'Upper Power', focus: 'Nageur + Gymnaste', badge: 'force', duration: '65-75 min', rest: false,
+        note: 'Séance carrure : pecs + épaules en poussée, tractions en tirage pour équilibrer. Abdos en charge (machine + suspendu) pour la visibilité.',
+        exercises: [
+          {name: 'Développé couché haltères', muscle: 'Pectoraux', nums: '4 × 6-8'},
+          {name: 'Développé incliné haltères', muscle: 'Haut pectoraux', nums: '4 × 8-10'},
+          {name: 'Tractions pronation', muscle: 'Dos', nums: '4 × 6-10'},
+          {name: 'Développé militaire', muscle: 'Épaules', nums: '3 × 8'},
+          {name: 'Élévations latérales', muscle: 'Deltoïdes', nums: '4 × 15-20'},
+          {name: 'Face pull', muscle: 'Arrière épaules', nums: '3 × 15'},
+          {name: 'Relevés de jambes suspendu', muscle: 'Abdos (bas)', nums: '3 × 12-15'},
+          {name: 'Crunch machine lesté', muscle: 'Abdos (haut)', nums: '3 × 12-15'},
+          {name: 'Gainage planche', muscle: 'Sangle abdo', nums: '2 × 45-60s'}
+        ]
+      },
+      {
+        tag: 'J2', title: 'Lower Power', focus: 'Sprinteur', badge: 'force', duration: '60-70 min', rest: false,
+        note: 'Presse à cuisses + leg curl/extension lombaire remplacent squat barre et soulevé de terre roumain.',
+        exercises: [
+          {name: 'Presse à cuisses', muscle: 'Quadriceps', nums: '4 × 10-12'},
+          {name: 'Leg curl allongé', muscle: 'Ischios', nums: '3 × 10-12'},
+          {name: 'Extension lombaire', muscle: 'Lombaires', nums: '3 × 12-15'},
+          {name: 'Fentes marchées', muscle: 'Fessiers', nums: '3 × 12'},
+          {name: 'Mollets debout', muscle: 'Mollets', nums: '4 × 15'},
+          {name: 'Sprints 30m', muscle: 'Full lower', nums: '6 × récup complète'}
+        ]
+      },
+      {
+        tag: 'J3', title: 'Dos XXL', focus: 'Aviron', badge: 'force', duration: '65-75 min', rest: false,
+        note: 'Volume dos maximal de la semaine — le plus rentable pour l\'illusion V-taper avec une taille fine.',
+        exercises: [
+          {name: 'Tractions lestées', muscle: 'Dos', nums: '4 × 6-8'},
+          {name: 'Tirage vertical prise large', muscle: 'Grand dorsal', nums: '4 × 10'},
+          {name: 'Rowing barre', muscle: 'Dos épais', nums: '4 × 8'},
+          {name: 'Rowing poulie basse', muscle: 'Dos milieu', nums: '3 × 12'},
+          {name: 'Pull-over poulie', muscle: 'Grand dorsal', nums: '3 × 15'},
+          {name: 'Curl incliné haltères', muscle: 'Biceps', nums: '3 × 10'},
+          {name: 'Farmer walk', muscle: 'Trapèzes / grip', nums: '3 × 40m'}
+        ]
+      },
+      {
+        tag: 'J4', title: 'Repos actif', focus: 'Natation ou marche', badge: 'repos', duration: '30-40 min', rest: true,
+        note: 'Natation légère si accès, sinon marche + mobilité. Pas d\'intensité — vraie récupération.',
+        exercises: []
+      },
+      {
+        tag: 'J5', title: 'Upper Hypertrophy', focus: 'Finition esthétique', badge: 'hyper', duration: '60-70 min', rest: false,
+        note: 'Volume élevé, charges plus légères — focus sur la forme du muscle. Abdos en charge progressive, pas de gainage statique seul.',
+        exercises: [
+          {name: 'Développé incliné haltères', muscle: 'Haut pectoraux', nums: '4 × 10'},
+          {name: 'Dips', muscle: 'Pectoraux / triceps', nums: '3 × 10'},
+          {name: 'Écartés poulie', muscle: 'Pectoraux', nums: '3 × 15'},
+          {name: 'Élévations latérales', muscle: 'Deltoïdes', nums: '5 × 20'},
+          {name: 'Oiseau', muscle: 'Arrière épaules', nums: '4 × 15'},
+          {name: 'Extension triceps poulie', muscle: 'Triceps', nums: '3 × 12'},
+          {name: 'Curl marteau', muscle: 'Biceps / avant-bras', nums: '3 × 12'},
+          {name: 'Crunch câble lesté', muscle: 'Abdos (haut)', nums: '3 × 15-20'},
+          {name: 'Rotation oblique poulie', muscle: 'Obliques', nums: '3 × 12/côté'}
+        ]
+      },
+      {
+        tag: 'J6', title: 'Athletic Day', focus: 'Explosivité globale', badge: 'explo', duration: '55-65 min', rest: false,
+        note: 'Sans boxe ni burpees longs. Battle ropes si disponibles, sinon rameur.',
+        exercises: [
+          {name: 'Rameur', muscle: 'Full body', nums: '1 × 8 min'},
+          {name: 'Box jump', muscle: 'Jambes explosif', nums: '5 × 5'},
+          {name: 'Farmer walk lourd', muscle: 'Grip / trapèzes', nums: '4 × 40m'},
+          {name: 'Tractions', muscle: 'Dos', nums: '3 × max propre'},
+          {name: 'Pompes explosives', muscle: 'Pectoraux', nums: '3 × 8-10'},
+          {name: 'Rotation médecine ball', muscle: 'Obliques', nums: '3 × 10/côté'},
+          {name: 'Gainage complet', muscle: 'Core', nums: 'circuit 3 min'}
+        ]
+      },
+      {
+        tag: 'J7', title: 'Repos complet', focus: 'Aucune activité structurée', badge: 'repos', duration: '—', rest: true,
+        note: 'C\'est pendant le repos que le muscle se construit réellement.',
+        exercises: []
+      }
+    ]
+  },
+  journal: {
+    notes: [
+      {title: 'Note de départ', content: 'Programme initialisé et adapté au cycle actuel. La logique de suivi devient maintenant dynamique.'}
+    ]
+  }
+};
+
+const STORAGE_KEY = 'athlete-premium-user-data-v1';
+
+function hydrateUserData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed.profile) Object.assign(userData.profile, parsed.profile);
+    if (parsed.nutrition) Object.assign(userData.nutrition, parsed.nutrition);
+    if (parsed.objective) Object.assign(userData.objective, parsed.objective);
+    if (parsed.progression) Object.assign(userData.progression, parsed.progression);
+    if (parsed.program) {
+      if (Array.isArray(parsed.program.days)) userData.program.days = parsed.program.days;
+      if (parsed.program.weeklySessionCount !== undefined) userData.program.weeklySessionCount = parsed.program.weeklySessionCount;
+    }
+    if (parsed.journal) {
+      if (Array.isArray(parsed.journal.notes)) userData.journal.notes = parsed.journal.notes;
+    }
+  } catch (error) {
+    console.warn('Impossible de charger les données sauvegardées', error);
+  }
+}
+
+function saveUserData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+  } catch (error) {
+    console.warn('Impossible de sauvegarder les données', error);
+  }
+}
+
+function populateProfileForm() {
+  const firstName = document.getElementById('edit-firstname');
+  const height = document.getElementById('edit-height');
+  const currentWeight = document.getElementById('edit-currentWeight');
+  const targetWeight = document.getElementById('edit-targetWeight');
+  if (firstName) firstName.value = userData.profile.firstName;
+  if (height) height.value = userData.profile.height;
+  if (currentWeight) currentWeight.value = userData.profile.currentWeight;
+  if (targetWeight) targetWeight.value = userData.profile.targetWeight;
+}
+
+function refreshApp() {
+  renderDays();
+  renderChips();
+  updateDateBits();
+  updateTodayView();
+  updateProfileView();
+  updateProgressView();
+  updateJournalView();
+  renderDial();
+  renderTrajectory();
+}
+
+hydrateUserData();
+
+const DAYS = userData.program.days;
+const GOAL_DATE = new Date(userData.objective.targetDate);
+const BIRTHDATE = new Date(userData.profile.birthDate);
+
+function formatNumber(value, digits = 1) {
+  return Number(value).toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).replace('.', ',');
+}
+
+function formatWeight(value) {
+  return formatNumber(value, 1) + 'kg';
+}
+
+function getWeightGap() {
+  return userData.profile.targetWeight - userData.profile.currentWeight;
+}
+
+function getWeightGapLabel() {
+  const gap = getWeightGap();
+  return (gap >= 0 ? '+' : '') + formatNumber(Math.abs(gap), 1) + 'kg';
+}
+
+/* ============================================================
+   RENDER — training days (accordion)
+   ============================================================ */
+function renderDays() {
+  const mount = document.getElementById('days-mount');
+  mount.innerHTML = DAYS.map((day, i) => {
+    const exHtml = day.exercises.map(ex => `
+      <div class="ex-row">
+        <div>
+          <div class="ex-name">${ex.name}</div>
+          <div class="ex-muscle">${ex.muscle}</div>
+        </div>
+        <div class="ex-nums">${ex.nums}</div>
+      </div>
+    `).join('');
+    return `
+      <div class="day-card" id="day-${i}">
+        <div class="day-head" onclick="toggleDay(${i})">
+          <div class="day-head-left">
+            <div class="day-num ${day.badge}">${day.tag}</div>
+            <div>
+              <div class="day-title">${day.title}</div>
+              <div class="day-meta">
+                <span>${day.rest ? day.focus : day.exercises.length + ' exercices'}</span>
+                ${day.rest ? '' : '<span>·</span><span>' + day.duration + '</span>'}
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:9px;">
+            <span class="badge ${day.badge}">${day.badge === 'force' ? 'Force' : day.badge === 'hyper' ? 'Hypertrophie' : day.badge === 'explo' ? 'Explosivité' : 'Repos'}</span>
+            <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+        <div class="day-body"><div class="day-body-inner">
+          <div class="day-note">${day.note}</div>
+          ${exHtml}
+        </div></div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleDay(i) {
+  const card = document.getElementById('day-' + i);
+  const wasOpen = card.classList.contains('open');
+  document.querySelectorAll('.day-card').forEach(c => c.classList.remove('open'));
+  if (!wasOpen) card.classList.add('open');
+}
+
+/* ============================================================
+   RENDER — cycle chip row (home)
+   ============================================================ */
+function renderChips() {
+  const mount = document.getElementById('chip-row');
+  mount.innerHTML = DAYS.map(d => {
+    const cls = d.badge === 'force' ? 'force' : d.badge === 'explo' ? 'explo' : d.rest ? 'repos' : '';
+    return `<span class="chip ${cls}">${d.tag} · ${d.title.split(' ')[0]}</span>`;
+  }).join('');
+}
+
+/* ============================================================
+   NAVIGATION — tabs + cross-links (e.g. flagship card → training)
+   ============================================================ */
+function switchTab(name) {
+  const activeTab = name === 'edit-profile' ? 'profile' : name;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === activeTab));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+  if (name === 'edit-profile') populateProfileForm();
+  window.scrollTo({top: 0, behavior: 'instant'});
+}
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => switchTab(tab.dataset.view));
+});
+document.getElementById('open-edit-profile')?.addEventListener('click', () => switchTab('edit-profile'));
+document.getElementById('cancel-edit-profile')?.addEventListener('click', () => switchTab('profile'));
+document.getElementById('profile-edit-form')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+
+  const firstName = String(formData.get('firstName') || '').trim();
+  const height = Number(formData.get('height'));
+  const currentWeight = Number(formData.get('currentWeight'));
+  const targetWeight = Number(formData.get('targetWeight'));
+
+  if (firstName) userData.profile.firstName = firstName;
+  if (Number.isFinite(height)) userData.profile.height = height;
+  if (Number.isFinite(currentWeight)) userData.profile.currentWeight = currentWeight;
+  if (Number.isFinite(targetWeight)) userData.profile.targetWeight = targetWeight;
+
+  saveUserData();
+  refreshApp();
+  switchTab('profile');
+});
+
+function jumpToDay(i) {
+  switchTab('training');
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.day-card').forEach(c => c.classList.remove('open'));
+    const card = document.getElementById('day-' + i);
+    if (card) {
+      card.classList.add('open');
+      card.scrollIntoView({block: 'start', behavior: 'smooth'});
+    }
+  });
+}
+
+/* ============================================================
+   DATA UPDATES — visible values now come from userData
+   ============================================================ */
+function updateTodayView() {
+  const greetingName = document.querySelector('.hero-greeting .hi b');
+  if (greetingName) greetingName.textContent = userData.profile.firstName;
+
+  const gap = getWeightGap();
+  const gapValue = document.querySelector('.dial-center .metric');
+  if (gapValue) {
+    gapValue.innerHTML = `${gap >= 0 ? '+' : ''}${formatNumber(Math.abs(gap), 1)}<small>kg</small>`;
+  }
+
+  const gapLabel = document.querySelector('.dial-center .metric-lbl');
+  if (gapLabel) gapLabel.textContent = userData.objective.goalLabel;
+
+  const legendRows = document.querySelectorAll('.dial-row');
+  userData.progression.dial.forEach((item, index) => {
+    const row = legendRows[index];
+    if (!row) return;
+    row.querySelector('.name').textContent = item.name;
+    row.querySelector('.val').textContent = item.value;
+    const swatch = row.querySelector('.swatch');
+    if (swatch) swatch.style.background = item.color;
+  });
+
+  const featuredDay = DAYS.find(day => day.tag === 'J3') || DAYS[2] || DAYS[0];
+  const flagshipValue = document.querySelector('#flagship .flagship-num');
+  const flagshipTitle = document.querySelector('#flagship .flagship-info .t');
+  const flagshipSub = document.querySelector('#flagship .flagship-info .s');
+  if (flagshipValue) flagshipValue.textContent = featuredDay.tag;
+  if (flagshipTitle) flagshipTitle.textContent = featuredDay.title;
+  if (flagshipSub) flagshipSub.textContent = `${featuredDay.focus} · ${featuredDay.exercises.length} exercices`;
+
+  const currentWeightEl = document.querySelector('.traj-nums .from');
+  const targetWeightEl = document.querySelector('.traj-nums .to');
+  const deltaEl = document.querySelector('.traj-nums .delta');
+  if (currentWeightEl) currentWeightEl.textContent = formatWeight(userData.profile.currentWeight);
+  if (targetWeightEl) targetWeightEl.textContent = formatWeight(userData.profile.targetWeight);
+  if (deltaEl) deltaEl.textContent = getWeightGapLabel();
+}
+
+function updateProfileView() {
+  const profileName = document.querySelector('#view-profile .profile-head .name');
+  if (profileName) {
+    profileName.textContent = `${userData.profile.firstName} ${userData.profile.lastName}`.trim();
+  }
+
+  const profileMeta = document.querySelector('#view-profile .profile-head .meta');
+  if (profileMeta) {
+    profileMeta.textContent = `${userData.profile.height} cm · ${userData.profile.gym} · ${userData.profile.style}`;
+  }
+
+  const avatar = document.querySelector('#view-profile .avatar');
+  if (avatar) avatar.textContent = userData.profile.avatarInitial;
+
+  const profileCards = document.querySelectorAll('#view-profile .list-card');
+  if (profileCards[0]) {
+    const values = profileCards[0].querySelectorAll('.list-row .val');
+    values[0].textContent = formatWeight(userData.profile.currentWeight);
+    values[1].textContent = formatWeight(userData.profile.targetWeight);
+    values[2].textContent = `~${userData.progression.bodyFat}%`;
+    values[3].textContent = `${userData.profile.muscleMass}%`;
+  }
+
+  if (profileCards[1]) {
+    const values = profileCards[1].querySelectorAll('.list-row .val');
+    values[0].textContent = `${userData.nutrition.calories} kcal`;
+    values[1].textContent = `${userData.nutrition.proteins} g`;
+    values[2].textContent = userData.objective.weeklyGain;
+    values[3].textContent = userData.nutrition.water;
+  }
+}
+
+function updateProgressView() {
+  const statValues = document.querySelectorAll('#view-progress .stat-grid .stat-tile .v');
+  if (statValues[0]) statValues[0].innerHTML = `${formatNumber(userData.profile.currentWeight, 1)}<small>kg</small>`;
+  if (statValues[1]) statValues[1].innerHTML = `${formatNumber(userData.profile.targetWeight, 1)}<small>kg</small>`;
+  if (statValues[2]) statValues[2].innerHTML = `${getWeightGap() >= 0 ? '+' : ''}${formatNumber(Math.abs(getWeightGap()), 1)}<small>kg</small>`;
+
+  const muscleRows = document.querySelectorAll('#view-progress .muscle-legend .mrow');
+  userData.progression.muscleDistribution.forEach((item, index) => {
+    const row = muscleRows[index];
+    if (!row) return;
+    const name = row.querySelector('.name');
+    const pct = row.querySelector('.pct');
+    const dot = row.querySelector('.dot2');
+    if (name) name.textContent = item.name;
+    if (pct) pct.textContent = `${item.pct}%`;
+    if (dot) {
+      dot.style.background = item.color;
+      if (item.opacity !== undefined) dot.style.opacity = item.opacity;
+      if (item.border) dot.style.border = '1px solid var(--chalk-25)';
+    }
+  });
+
+  const recordValues = document.querySelectorAll('#view-progress .field-tile .v');
+  userData.progression.records.forEach((item, index) => {
+    const field = recordValues[index];
+    if (field) field.textContent = item.value;
+  });
+}
+
+function updateJournalView() {
+  const title = document.querySelector('#view-journal .empty-state h3');
+  const text = document.querySelector('#view-journal .empty-state p');
+  const latestNote = userData.journal.notes[0];
+  if (latestNote) {
+    if (title) title.textContent = latestNote.title;
+    if (text) text.textContent = latestNote.content;
+  }
+}
+
+/* ============================================================
+   DATE / AGE — simple display logic, computed from real dates
+   ============================================================ */
+function updateDateBits() {
+  const now = new Date();
+  const dayFmt = now.toLocaleDateString('fr-FR', {weekday: 'long', day: '2-digit', month: 'long'});
+  document.getElementById('date-pill').textContent = now.toLocaleDateString('fr-FR', {weekday: 'short', day: '2-digit', month: 'short'}).toUpperCase();
+  document.getElementById('day-full').textContent = dayFmt.charAt(0).toUpperCase() + dayFmt.slice(1);
+
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const weeksLeft = Math.max(0, Math.ceil((GOAL_DATE - now) / msPerWeek));
+  document.getElementById('weeks-left').textContent = weeksLeft;
+  document.getElementById('stat-weeks').textContent = weeksLeft;
+
+  let age = now.getFullYear() - BIRTHDATE.getFullYear();
+  const hasHadBirthday = (now.getMonth() > BIRTHDATE.getMonth()) || (now.getMonth() === BIRTHDATE.getMonth() && now.getDate() >= BIRTHDATE.getDate());
+  if (!hasHadBirthday) age--;
+  document.getElementById('profile-age').textContent = `${userData.profile.firstName} — ${age} ans`;
+}
+
+/* ============================================================
+   RING ANIMATION — values now come from userData
+   ============================================================ */
+function renderDial() {
+  const rings = [
+    {id: 'ring-force', r: 76, pct: userData.progression.dial[0].pct},
+    {id: 'ring-explo', r: 59, pct: userData.progression.dial[1].pct},
+    {id: 'ring-recup', r: 42, pct: userData.progression.dial[2].pct}
+  ];
+  rings.forEach(ring => {
+    const c = 2 * Math.PI * ring.r;
+    const el = document.getElementById(ring.id);
+    el.style.strokeDasharray = c;
+    el.style.strokeDashoffset = c;
+    requestAnimationFrame(() => {
+      el.style.strokeDashoffset = c - (ring.pct / 100) * c;
+    });
+  });
+}
+
+/* ============================================================
+   TRAJECTORY BAR — values now come from userData
+   ============================================================ */
+function renderTrajectory() {
+  const start = userData.profile.startingWeight;
+  const current = userData.profile.currentWeight;
+  const goal = userData.profile.targetWeight;
+  const pct = Math.max(2, Math.min(100, ((current - start) / (goal - start)) * 100));
+  requestAnimationFrame(() => {
+    document.getElementById('traj-bar').style.width = pct + '%';
+  });
+}
+
+/* ============================================================
+   SCROLL REVEAL
+   ============================================================ */
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('in-view');
+      observer.unobserve(entry.target);
+    }
+  });
+}, {threshold: 0.12});
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+/* ============================================================
+   INIT
+   ============================================================ */
+refreshApp();
+</script>
+
+</body>
+</html>
