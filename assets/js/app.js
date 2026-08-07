@@ -85,6 +85,11 @@ function initProfileForm() {
 // ===============================
 // Démarrage
 // ===============================
+// Connexion avec les modules
+if (typeof initUserModule === "function") initUserModule(user);
+if (typeof initTrainingModule === "function") initTrainingModule(user);
+if (typeof initProgressModule === "function") initProgressModule(user);
+if (typeof initNutritionModule === "function") initNutritionModule(user);
 
 document.addEventListener("DOMContentLoaded", () => {
     updateUI();
