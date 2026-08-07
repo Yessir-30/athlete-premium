@@ -1277,6 +1277,36 @@ document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 refreshApp();
 </script>
 <script src="assets/js/app.js"></script>
+<!-- ===============================
+FORMULAIRE PROFIL UTILISATEUR
+=============================== -->
+<section class="profile-edit">
+    <h2>Modifier mon profil</h2>
+
+    <form id="profile-form">
+        <label>Nom</label>
+        <input type="text" name="name" placeholder="Nom" required>
+
+        <label>Âge</label>
+        <input type="number" name="age" placeholder="Âge" required>
+
+        <label>Poids (kg)</label>
+        <input type="number" name="weight" placeholder="Poids" required>
+
+        <label>Taille (cm)</label>
+        <input type="number" name="height" placeholder="Taille" required>
+
+        <label>Objectif</label>
+        <select name="goal">
+            <option value="Hypertrophie">Hypertrophie</option>
+            <option value="Perte de poids">Perte de poids</option>
+            <option value="Endurance">Endurance</option>
+            <option value="Force">Force</option>
+        </select>
+
+        <button type="submit">Enregistrer</button>
+    </form>
+</section>
 
 </body>
 </html>
