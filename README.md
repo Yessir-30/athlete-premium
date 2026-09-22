@@ -27,7 +27,3 @@ Voir CHANGELOG.md
 
 ## 🔧 TODO
 Voir TODO.md
-
-## 👤 Rôle
-- Product Owner : Yessir ALI
-- Développeur : GitHub Copilot + contributions externes
